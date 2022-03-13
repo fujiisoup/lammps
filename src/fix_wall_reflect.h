@@ -43,6 +43,7 @@ class FixWallReflect : public Fix {
   int varindex[6];
   int varflag;
   double xscale, yscale, zscale;
+  double restitution_coef;
 
   virtual void wall_particle(int m, int which, double coord);
 };

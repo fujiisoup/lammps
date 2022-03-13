@@ -46,6 +46,7 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
   // parse args
 
   nwall = 0;
+  restitution_coef = 1.0;
   int scaleflag = 1;
 
   int iarg = 3;
@@ -92,7 +93,10 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
       else error->all(FLERR,"Illegal fix wall/reflect command");
       iarg += 2;
 
-    } else error->all(FLERR,"Illegal fix wall/reflect command");
+    } else if (strcmp(arg[iarg],"restitution") == 0){
+      restitution_coef = std::stof(arg[iarg+1]);
+      iarg += 2;
+    }else error->all(FLERR,"Illegal fix wall/reflect command");
   }
 
   // error check
@@ -230,12 +234,12 @@ void FixWallReflect::wall_particle(int /* m */, int which, double coord)
       if (side == 0) {
         if (x[i][dim] < coord) {
           x[i][dim] = coord + (coord - x[i][dim]);
-          v[i][dim] = -v[i][dim];
+          v[i][dim] = -v[i][dim] * restitution_coef;
         }
       } else {
         if (x[i][dim] > coord) {
           x[i][dim] = coord - (x[i][dim] - coord);
-          v[i][dim] = -v[i][dim];
+          v[i][dim] = -v[i][dim] * restitution_coef;
         }
       }
     }
