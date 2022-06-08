@@ -23,6 +23,7 @@
 #include "modify.h"
 #include "update.h"
 #include "variable.h"
+#include "random_mars.h"
 
 #include <cstring>
 
@@ -33,7 +34,8 @@ using namespace FixConst;
 
 FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg),
-  nwall(0)
+  nwall(0), 
+  random(nullptr)
 {
   if (narg < 4) error->all(FLERR,"Illegal fix wall/reflect command");
 
@@ -47,6 +49,10 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
 
   nwall = 0;
   restitution_coef = 1.0;
+  heating_seed = 0;
+  heating_hole_radius_sq_lo = 0.0;
+  heating_hole_radius_sq_hi = 0.0;
+  heating_temperature = 1.0;
   int scaleflag = 1;
 
   int iarg = 3;
@@ -96,6 +102,14 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
     } else if (strcmp(arg[iarg],"restitution") == 0){
       restitution_coef = std::stof(arg[iarg+1]);
       iarg += 2;
+    } else if (strcmp(arg[iarg],"heating") == 0){
+      heating_seed = std::stof(arg[iarg+1]);
+      heating_hole_radius_sq_lo = std::stof(arg[iarg+2]);
+      heating_hole_radius_sq_lo = pow(heating_hole_radius_sq_lo, 2);
+      heating_hole_radius_sq_hi = std::stof(arg[iarg+3]);
+      heating_hole_radius_sq_hi = pow(heating_hole_radius_sq_hi, 2);
+      heating_temperature = std::stof(arg[iarg+4]);
+      iarg += 5;
     }else error->all(FLERR,"Illegal fix wall/reflect command");
   }
 
@@ -144,6 +158,8 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
   varflag = 0;
   for (int m = 0; m < nwall; m++)
     if (wallstyle[m] == VARIABLE) varflag = 1;
+
+  random = new RanMars(lmp, heating_seed + comm->me);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -216,15 +232,23 @@ void FixWallReflect::post_integrate()
 /* ----------------------------------------------------------------------
    this method may be overwritten by a child class
 ------------------------------------------------------------------------- */
+double FixWallReflect::get_radius_sq(double *x, int dim){
+  double radius = 0.0;
+  for (int j = 0; j < 3; j++){
+    if (j != dim) radius += x[j]*x[j];
+  }
+  return radius;
+}
 
 void FixWallReflect::wall_particle(int /* m */, int which, double coord)
 {
-  int i,dim,side;
+  int i,j,dim,side;
 
   double **x = atom->x;
   double **v = atom->v;
   int *mask = atom->mask;
   int nlocal = atom->nlocal;
+  double radius = 0.0;
 
   dim = which / 2;
   side = which % 2;
@@ -234,12 +258,24 @@ void FixWallReflect::wall_particle(int /* m */, int which, double coord)
       if (side == 0) {
         if (x[i][dim] < coord) {
           x[i][dim] = coord + (coord - x[i][dim]);
-          v[i][dim] = -v[i][dim] * restitution_coef;
+          if (get_radius_sq(x[i], dim) < heating_hole_radius_sq_hi){
+            for (j = 0; j < 3; j++)
+              v[i][j] = random->gaussian(0,heating_temperature);
+            v[i][dim] = abs(v[i][dim]);
+          } else{
+            v[i][dim] = -v[i][dim] * restitution_coef;
+          }
         }
       } else {
         if (x[i][dim] > coord) {
           x[i][dim] = coord - (x[i][dim] - coord);
-          v[i][dim] = -v[i][dim] * restitution_coef;
+          if (get_radius_sq(x[i], dim) < heating_hole_radius_sq_lo){
+            for (j = 0; j < 3; j++)
+              v[i][j] = random->gaussian(0,heating_temperature);
+            v[i][dim] = -abs(v[i][dim]);
+          } else {
+            v[i][dim] = -v[i][dim] * restitution_coef;
+          }
         }
       }
     }

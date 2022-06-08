@@ -44,8 +44,17 @@ class FixWallReflect : public Fix {
   int varflag;
   double xscale, yscale, zscale;
   double restitution_coef;
+  double heating_seed;
+  double heating_hole_radius_sq_lo;
+  double heating_hole_radius_sq_hi;
+  double heating_temperature;
+  
+  class RanMars *random;
 
   virtual void wall_particle(int m, int which, double coord);
+
+ private:
+  double get_radius_sq(double *x, int dim);
 };
 
 }    // namespace LAMMPS_NS
