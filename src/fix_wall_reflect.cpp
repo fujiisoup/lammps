@@ -48,8 +48,8 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
   // parse args
 
   nwall = 0;
+  heating_seed = 1;
   restitution_coef = 1.0;
-  heating_seed = 0;
   heating_hole_radius_sq_lo = 0.0;
   heating_hole_radius_sq_hi = 0.0;
   heating_temperature = 1.0;
@@ -103,7 +103,7 @@ FixWallReflect::FixWallReflect(LAMMPS *lmp, int narg, char **arg) :
       restitution_coef = std::stof(arg[iarg+1]);
       iarg += 2;
     } else if (strcmp(arg[iarg],"heating") == 0){
-      heating_seed = std::stof(arg[iarg+1]);
+      heating_seed = utils::numeric(FLERR,arg[iarg+1],false,lmp);
       heating_hole_radius_sq_lo = std::stof(arg[iarg+2]);
       heating_hole_radius_sq_lo = pow(heating_hole_radius_sq_lo, 2);
       heating_hole_radius_sq_hi = std::stof(arg[iarg+3]);
@@ -170,6 +170,8 @@ FixWallReflect::~FixWallReflect()
 
   for (int m = 0; m < nwall; m++)
     if (wallstyle[m] == VARIABLE) delete [] varstr[m];
+
+  delete random;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -261,7 +263,7 @@ void FixWallReflect::wall_particle(int /* m */, int which, double coord)
           if (get_radius_sq(x[i], dim) < heating_hole_radius_sq_hi){
             for (j = 0; j < 3; j++)
               v[i][j] = random->gaussian(0,heating_temperature);
-            v[i][dim] = abs(v[i][dim]);
+            v[i][dim] = -abs(v[i][dim]);
           } else{
             v[i][dim] = -v[i][dim] * restitution_coef;
           }
@@ -272,7 +274,7 @@ void FixWallReflect::wall_particle(int /* m */, int which, double coord)
           if (get_radius_sq(x[i], dim) < heating_hole_radius_sq_lo){
             for (j = 0; j < 3; j++)
               v[i][j] = random->gaussian(0,heating_temperature);
-            v[i][dim] = -abs(v[i][dim]);
+            v[i][dim] = abs(v[i][dim]);
           } else {
             v[i][dim] = -v[i][dim] * restitution_coef;
           }

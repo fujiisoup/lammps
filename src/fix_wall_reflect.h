@@ -44,7 +44,7 @@ class FixWallReflect : public Fix {
   int varflag;
   double xscale, yscale, zscale;
   double restitution_coef;
-  double heating_seed;
+  int heating_seed;
   double heating_hole_radius_sq_lo;
   double heating_hole_radius_sq_hi;
   double heating_temperature;
